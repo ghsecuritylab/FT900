@@ -134,14 +134,10 @@ static iot_handle g_handle = NULL;
 
 #define BUFFER_SIZE (128)
 
-//typedef struct
-//{
-    uint8_t     uart0BufferIn[BUFFER_SIZE];
-    uint16_t    wr_idx =0;
-//    uint16_t    rd_idx;
-//} RingBuffer_t;
 
-//static RingBuffer_t uart0BufferIn = { {0}, 0, 0 };
+uint8_t     uart0BufferIn[BUFFER_SIZE];
+uint16_t    wr_idx =0;
+
 
 void uart0ISR()
 {
