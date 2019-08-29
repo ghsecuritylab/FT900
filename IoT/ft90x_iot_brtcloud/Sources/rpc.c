@@ -64,6 +64,7 @@ int get_gpio( int number )
     uint8_t state;
 
     gpio_dir((uint8_t)number, pad_dir_output);
+    gpio_pull((uint8_t)number, pad_pull_none);
     //gpio_pull((uint8_t)number, pad_pull_pullup);
 
     state = gpio_read((uint8_t)number);
@@ -75,8 +76,9 @@ int get_gpio( int number )
 void set_gpio( int number, int value )
 {
     DEBUG_PRINTF( "%s[%d]=[%d]\r\n", API_SET_GPIO, number, value?1:0 );
-
-    gpio_dir((uint8_t)number, pad_dir_output);
+    gpio_dir((uint8_t)number, pad_dir_input);
+    gpio_pull((uint8_t)number, pad_pull_pullup);
+    //gpio_dir((uint8_t)number, pad_dir_output);
     //gpio_pull((uint8_t)number, pad_pull_none);
 
     gpio_write((uint8_t)number, value?1:0);

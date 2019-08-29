@@ -63,7 +63,8 @@
 
 ///////////////////////////////////////////////////////////////////////////////////
 #define CONFIG_NOTIFICATION_UART_KEYWORD "Hello World"
-#define CONFIG_NOTIFICATION_RECIPIENT "richmond.umagat@brtchip.com"
+#define CONFIG_NOTIFICATION_RECIPIENT "srikanth.anandapu@brtchip.com"
+#define CONFIG_NOTIFICATION_RECIPIENT_NUMBER "+6581946347"
 #define CONFIG_NOTIFICATION_MESSAGE "Hi, How are you today?"
 ///////////////////////////////////////////////////////////////////////////////////
 
@@ -131,7 +132,32 @@ static void user_subscribe_receive_cb(
 static iot_handle g_handle = NULL;
 ///////////////////////////////////////////////////////////////////////////////////
 
+#define BUFFER_SIZE (128)
 
+//typedef struct
+//{
+    uint8_t     uart0BufferIn[BUFFER_SIZE];
+    uint16_t    wr_idx =0;
+//    uint16_t    rd_idx;
+//} RingBuffer_t;
+
+//static RingBuffer_t uart0BufferIn = { {0}, 0, 0 };
+
+void uart0ISR()
+{
+    static uint8_t c;
+    /* Receive interrupt... */
+    if (uart_is_interrupted(UART0, uart_interrupt_rx))
+    {
+        /* Read a byte into the Buffer... */
+        uart_read(UART0, &c);
+        uart0BufferIn[wr_idx] = c;
+        uart_write(UART0, c);
+        /* Increment the pointer and wrap around */
+        wr_idx++;
+        if (wr_idx == BUFFER_SIZE) wr_idx = 0;
+    }
+}
 
 static void myputc( void* p, char c )
 {
@@ -153,6 +179,12 @@ static inline void uart_setup()
         uart_stop_bits_1
         );
 
+	interrupt_attach(interrupt_uart0, (uint8_t) interrupt_uart0, uart0ISR);
+	/* Enable the UART to fire interrupts when receiving data... */
+	uart_enable_interrupt(UART0, uart_interrupt_rx);
+	/* Enable interrupts to be fired... */
+	uart_enable_interrupts_globally(UART0);
+	interrupt_enable_globally();
     /* Enable tfp_printf() functionality... */
     init_printf( UART0, myputc );
 }
@@ -266,6 +298,9 @@ static void iot_app_task( void *pvParameters )
             continue;
         }
 
+        static uint8_t NEflag = 0;
+        static uint8_t NSflag = 0;
+		char* cptr = 0;
         /* subscribe and publish from/to server */
 #if USE_MQTT_SUBSCRIBE
         char* topic_sub = user_generate_subscribe_topic();
@@ -277,6 +312,91 @@ static void iot_app_task( void *pvParameters )
 
         do  {
             vTaskDelay( pdMS_TO_TICKS(1000) );
+            char *eptr = strstr(uart0BufferIn, "AT+NE+");
+
+            if(eptr!=NULL)
+			{
+            	NEflag = 1;
+				cptr = eptr;
+			}
+
+            if (NEflag) /* Substring found */
+			{
+				char *ptr = strstr(uart0BufferIn, "#");
+				if(ptr!=NULL)
+				{
+					DEBUG_PRINTF("\r\nUART:Email notification trigger received\r\n");
+					char topic[80] = {0};
+					char payload[128] = {0};
+					char msg[64];
+					char *pmsg;
+					ptr = cptr+6;
+
+					pmsg = msg;
+					while(*ptr!='#')
+					{
+						*pmsg = *ptr;
+						ptr++;
+						pmsg++;
+					}
+					*pmsg = '\0';
+					//memcpy(msg,cptr+6, 32);
+					//DEBUG_PRINTF( "%s\r\n\r\n", msg );
+					tfp_snprintf( topic, sizeof(topic), "%s%s/%s", PREPEND_REPLY_TOPIC, (char*)iot_utils_getdeviceid(), API_TRIGGER_NOTIFICATION );
+					tfp_snprintf( payload, sizeof(payload), "{\"recipient\": \"%s\", \"message\": \"%s\"}", CONFIG_NOTIFICATION_RECIPIENT, msg );
+					iot_publish( g_handle, topic, payload, strlen(payload), 1 );
+					DEBUG_PRINTF( "%s\r\n", topic );
+					DEBUG_PRINTF( "%s\r\n\r\n", payload );
+					memset(uart0BufferIn,0,BUFFER_SIZE);
+					wr_idx =0;
+					NEflag =0;
+					cptr = NULL;
+				}
+
+        	}
+
+            char *sptr = strstr(uart0BufferIn, "AT+NS+");
+
+			if(sptr!=NULL)
+			{
+				NSflag = 1;
+				cptr = sptr;
+			}
+
+            if (NSflag) /* Substring found */
+			{
+				char *ptr = strstr(uart0BufferIn, "#");
+				if(ptr!=NULL)
+				{
+					DEBUG_PRINTF("\r\nUART:SMS notification trigger received\r\n");
+					char topic[80] = {0};
+					char payload[128] = {0};
+					char msg[64];
+					char *pmsg;
+					ptr = cptr+6;
+
+					pmsg = msg;
+					while(*ptr!='#')
+					{
+						*pmsg = *ptr;
+						ptr++;
+						pmsg++;
+					}
+					*pmsg = '\0';
+					//memcpy(msg,cptr+6, 32);
+					//DEBUG_PRINTF( "%s\r\n\r\n", msg );
+					tfp_snprintf( topic, sizeof(topic), "%s%s/%s", PREPEND_REPLY_TOPIC, (char*)iot_utils_getdeviceid(), API_TRIGGER_NOTIFICATION );
+					tfp_snprintf( payload, sizeof(payload), "{\"recipient\": \"%s\", \"message\": \"%s\"}", CONFIG_NOTIFICATION_RECIPIENT_NUMBER, msg );
+					iot_publish( g_handle, topic, payload, strlen(payload), 1 );
+					DEBUG_PRINTF( "%s\r\n", topic );
+					DEBUG_PRINTF( "%s\r\n\r\n", payload );
+					memset(uart0BufferIn,0,BUFFER_SIZE);
+					wr_idx =0;
+					NSflag =0;
+					cptr = NULL;
+				}
+
+        	}
         } while ( net_is_ready() && iot_is_connected( handle ) == 0 );
 
         iot_unsubscribe( handle, topic_sub );
@@ -356,7 +476,7 @@ static uint32_t parse_gpio_int( char* ptr, char* str, char end )
     }
     ptr += (temp-ptr) + strlen(str);
 
-    uint32_t val = strtoul(ptr, NULL, 10);
+    uint32_t val = strtoul(ptr+1, NULL, 10);
 
     return val;
 }
