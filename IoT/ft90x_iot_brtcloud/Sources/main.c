@@ -64,7 +64,7 @@
 ///////////////////////////////////////////////////////////////////////////////////
 #define CONFIG_NOTIFICATION_UART_KEYWORD "Hello World"
 #define CONFIG_NOTIFICATION_RECIPIENT "srikanth.anandapu@brtchip.com"
-#define CONFIG_NOTIFICATION_RECIPIENT_NUMBER "+6581946347"
+#define CONFIG_NOTIFICATION_RECIPIENT_NUMBER "+1234567890"
 #define CONFIG_NOTIFICATION_MESSAGE "Hi, How are you today?"
 ///////////////////////////////////////////////////////////////////////////////////
 
